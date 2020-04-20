@@ -1,0 +1,114 @@
+% $r->content_type('application/json; charset=utf-8');
+<% JSON( \%out ) |n %>
+% $m->abort;
+<%init>
+use JSON qw(from_json to_json);
+my $args =  from_json( $ARGS{'POSTDATA'} ) || ();
+
+unless ( $args && $args ne "null" ) {
+    $m->out(JSON( { Response => 400, Message => "No args provided" } ));
+    $m->abort;
+}
+
+my $queue = RT::Queue->new( RT->SystemUser );
+$queue->Load( 'Issues' );
+
+unless ( $queue->Id ) {
+    $m->out(JSON( { Response => 400, Message => "Could not load issues queue" } ));
+    $m->abort;
+}
+
+my $user = undef;
+if ( $args && $args->{'user'} && $args->{'user'}->{'email'} ) {
+    $user = RT::User->new( RT->SystemUser );
+
+    my ($ret, $msg) = $user->Load( $args->{'user'}->{'email'} );
+    unless ( $ret && $user->Id ) {
+        RT::Logger->error( "Could not load user $args->{'user'}->{'email'}: $msg" );
+
+        $m->out(JSON( { Response => 400, Message => "Could not load user $args->{'user'}->{'email'}" } ));
+        $m->abort;
+    }
+}
+
+my $issue_gitlab_id = $args->{'object_attributes'}->{'id'};
+my $attrs = $args->{'object_attributes'};
+
+my $gitlab_id = RT::CustomField->new( RT->SystemUser );
+my ($ret, $msg) = $gitlab_id->LoadByName( Name => 'GitLab: id' );
+unless ( $ret ) {
+    RT::Logger->error( "Could not load 'GitLab: id' custom field: $msg" );
+    $m->out(JSON( { Response => 400, Message => "Custom field 'GitLab: id' not applied to issues queue" } ));
+    $m->abort;
+}
+
+# Check if any tickets already exists for this issue ID
+my $tickets = RT::Tickets->new( RT->SystemUser );
+$tickets->LimitCustomField( CUSTOMFIELD => $gitlab_id->Id, VALUE => $issue_gitlab_id, OPERATOR => '=' );
+my $ticket = $tickets->First;
+
+my %out = ();
+
+# If this is a new comment:
+if ( $args->{'object_kind'} eq 'note' ) {
+    unless ( $ticket && $ticket->Id ) {
+        RT::Logger->error( "Could not load existing issue with ID: $issue_gitlab_id" );
+        $m->out(JSON( { Response => 400, Message => "Could not load existing issue with id: $issue_gitlab_id" } ));
+        $m->abort;
+    }
+
+    ($ret, $msg) = $ticket->Correspond(
+        Content => $attrs->{'note'}
+    );
+    if ( $ret ) {
+        $out{Message} = "Add correspond!";
+        $out{Response} = 200;
+    }
+    else {
+        RT::Logger->error( "Could not add Correspond: $msg" );
+        $m->out(JSON( { Response => 400, Message => "Could not add Correspond" } ));
+        $m->abort;
+    }
+}
+# If we are creating a new issue:
+elsif ( $args->{'object_kind'} eq 'issue' ) {
+    # Status update to existing ticket
+    if ( $ticket && $ticket->Id && $attrs->{'action'} ) {
+        ($ret, $msg) = $ticket->SetStatus( $attrs->{'action'} );
+        if ( $ret ) {
+            $out{'Response'} = 200;
+            $out{'Message'}  = "Updated issue status to $attrs->{'action'}";
+        }
+        else {
+            RT::Logger->error( "Could not set issue status to $attrs->{'action'}: $msg" );
+
+            $out{'Response'} = 400;
+            $out{'Message'}  = "Could not set issue status to $attrs->{'action'}";
+        }
+    }
+    else {
+        my $new_ticket = RT::Ticket->new( RT->SystemUser );
+
+        my ($ret, $msg) = $new_ticket->Create(
+            Queue    => $queue->Id,
+            Owner    => $user ? $user->Id : undef,
+            Subject  => $args->{'object_attributes'}->{'title'} || 'New Gitlab issue',
+        );
+
+        if ( $ret ) {
+            $out{'Response'} = 200;
+            $out{'Message'} = "Succesfully created new Issue in RT";
+
+            foreach my $field ( qw/id project_id author_id description url/ ) {
+                ($ret, $msg) = $new_ticket->AddCustomFieldValue( Field => "GitLab: $field", Value => $attrs->{$field} );
+                RT::Logger->error( "Could not set custom field value '$field': $msg" ) unless $ret;
+            }
+        }
+        else {
+            RT::Logger->error( "Could not create new issue: $msg" );
+            $m->out(JSON( { Response => 400 } ));
+            $m->abort;
+        }
+    }
+}
+</%init>

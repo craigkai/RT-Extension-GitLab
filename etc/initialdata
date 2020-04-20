@@ -1,0 +1,21 @@
+use strict;
+use warnings;
+
+my $QueueName = 'Issues';
+
+our @Queues = ({
+        Name              => $QueueName,
+        Description       => 'GitLab integration issues tracking queue',
+        CorrespondAddress => "",
+        CommentAddress    => "",
+        Lifecycle         => 'default',
+});
+
+our @CustomFields = map {
+    Name        => "GitLab: $_",
+    Type        => 'FreeformSingle',
+    LookupType  => 'RT::Queue-RT::Ticket',
+    Description => '',
+    ApplyTo     => $QueueName,
+    MaxValues   => 1,
+}, qw/id project_id author_id description url/;
