@@ -2,9 +2,10 @@
 <% JSON( \%out ) |n %>
 % $m->abort;
 <%init>
+my $token = RT::Interface::Web::RequestENV('HTTP_X_GITLAB_TOKEN');
 
 # CHANGE THIS
-$m->abort unless $r->headers_in->{'X-Gitlab-Token'} eq 'supersecrettoken';
+$m->abort unless $token eq 'supersecrettoken';
 
 use JSON qw(from_json to_json);
 my $args =  from_json( $ARGS{'POSTDATA'} ) || ();
