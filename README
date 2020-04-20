@@ -1,14 +1,10 @@
 NAME
-    RT-Extension-Gitlab - [One line description of module's purpose here]
+    RT-Extension-Gitlab
 
-DESCRIPTION
-    [Why would someone install this extension? What does it do? What problem
-    does it solve?]
+    Integrate RT and Gitlab issues.
 
 RT VERSION
-    Works with RT [What versions of RT is this known to work with?]
-
-    [Make sure to use requires_rt and rt_too_new in Makefile.PL]
+    Works with RT 5.0
 
 INSTALLATION
     perl Makefile.PL

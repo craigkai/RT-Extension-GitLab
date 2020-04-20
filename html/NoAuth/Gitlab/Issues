@@ -2,6 +2,10 @@
 <% JSON( \%out ) |n %>
 % $m->abort;
 <%init>
+
+# CHANGE THIS
+$m->abort unless $r->headers_in->{'X-Gitlab-Token'} eq 'supersecrettoken';
+
 use JSON qw(from_json to_json);
 my $args =  from_json( $ARGS{'POSTDATA'} ) || ();
 
@@ -22,7 +26,7 @@ my $user = undef;
 if ( $args && $args->{'user'} && $args->{'user'}->{'email'} ) {
     $user = RT::User->new( RT->SystemUser );
 
-    my ($ret, $msg) = $user->Load( $args->{'user'}->{'email'} );
+    my ($ret, $msg) = $user->LoadByEmail( $args->{'user'}->{'email'} );
     unless ( $ret && $user->Id ) {
         RT::Logger->error( "Could not load user $args->{'user'}->{'email'}: $msg" );
 
