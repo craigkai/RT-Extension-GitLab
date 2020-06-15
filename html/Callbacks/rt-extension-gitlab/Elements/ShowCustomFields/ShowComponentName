@@ -1,0 +1,17 @@
+
+<%init>
+if ( $CustomField->Name eq 'git branch' ) {
+    my $branch = $Object->FirstCustomFieldValue( 'git branch' );
+
+    $m->out(qq{
+        <a href="https://gitlab.com/kaiserengineering/DigitalDash_GUI/-/commits/$branch"><img alt="pipeline status" src="https://gitlab.com/kaiserengineering/DigitalDash_GUI/badges/$branch/pipeline.svg" /></a>
+        <a href="https://gitlab.com/kaiserengineering/DigitalDash_GUI/-/commits/$branch"><img alt="coverage report" src="https://gitlab.com/kaiserengineering/DigitalDash_GUI/badges/$branch/coverage.svg" /></a>
+    });
+}
+</%init>
+
+
+<%args>
+$CustomField => undef
+$Object      => undef
+</%args>
